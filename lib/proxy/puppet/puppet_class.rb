@@ -1,3 +1,5 @@
+require 'puppet/parser'
+
 module Proxy::Puppet
 
   class PuppetClass
@@ -7,24 +9,41 @@ module Proxy::Puppet
       # returns an array of PuppetClass objects.
       def scan_directory directory
         Dir.glob("#{directory}/*/manifests/**/*.pp").map do |manifest|
-          scan_manifest File.read(manifest)
+          scan_manifest File.read(manifest), manifest
         end.compact.flatten
       end
 
-      def scan_manifest manifest
+      def scan_manifest manifest, filename
         klasses = []
-        manifest.each_line do |line|
-          if line.match(/^\s*class\s+([\w:-]*)/)
-            klasses << new($1) unless $1 == ""
+        # Get a Puppet Parser to parse the manifest source
+        env = Puppet::Node::Environment.new
+        parser = Puppet::Parser::Parser.new env
+        ast = parser.parse manifest
+        # Get the parsed representation of the top most objects
+        hostclass = ast.instantiate ''
+        hostclass.each do |klass|
+          # Only look at classes
+          if klass.type == :hostclass and klass.namespace != ''
+            params = {}
+            # Get parameters and eventual default values
+            klass.arguments.each do |name, value|
+              value = value.to_s unless value == nil
+              params[name] = value
+            end
+            klasses << new(klass.namespace, params)
           end
         end
+        klasses
+      rescue => e
+        puts "Error while parsing #{filename}: #{e}"
         klasses
       end
 
     end
 
-    def initialize name
+    def initialize name, params
       @klass = name || raise("Must provide puppet class name")
+      @params = params
     end
 
     def to_s
@@ -40,6 +59,8 @@ module Proxy::Puppet
     def name
       has_module?(klass) ? klass[(klass.index("::")+2)..-1] : klass
     end
+
+    attr_reader :params
 
     private
     attr_reader :klass
