@@ -13,7 +13,7 @@ module Proxy::Puppet
         end.compact.flatten
       end
 
-      def scan_manifest manifest, filename
+      def scan_manifest manifest, filename = ''
         klasses = []
         # Get a Puppet Parser to parse the manifest source
         env = Puppet::Node::Environment.new
@@ -40,9 +40,9 @@ module Proxy::Puppet
 
     end
 
-    def initialize name, params
+    def initialize name, params = {}
       @klass = name || raise("Must provide puppet class name")
-      @params = params
+      @params = params || {}
     end
 
     def to_s

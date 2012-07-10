@@ -33,7 +33,7 @@ class PuppetClassTest < Test::Unit::TestCase
     manifest = <<-EOF
     class foreman::install {
       include 'x::y'
-
+    }
     EOF
     klasses =  Proxy::Puppet::PuppetClass.scan_manifest(manifest)
     assert_kind_of Array, klasses
