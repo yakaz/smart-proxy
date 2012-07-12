@@ -8,22 +8,29 @@ module Proxy::Puppet
       # scans a given directory and its sub directory for puppet classes
       # returns an array of PuppetClass objects.
       def scan_directory directory
+        # Get a Puppet Parser to parse the manifest source
+        parser = Puppet::Parser::Parser.new Puppet::Node::Environment.new
         Dir.glob("#{directory}/*/manifests/**/*.pp").map do |manifest|
-          scan_manifest File.read(manifest), manifest
+          scan_manifest File.read(manifest), manifest, parser
         end.compact.flatten
       end
 
-      def scan_manifest manifest, filename = ''
+      def scan_manifest manifest, filename = '', parser = nil
         klasses = []
         # Get a Puppet Parser to parse the manifest source
-        env = Puppet::Node::Environment.new
-        parser = Puppet::Parser::Parser.new env
+        parser = Puppet::Parser::Parser.new Puppet::Node::Environment.new if parser.nil?
+        already_seen = Set.new parser.known_resource_types.hostclasses.keys
+        already_seen << '' # Prevent the toplevel "main" class from matching
         ast = parser.parse manifest
         # Get the parsed representation of the top most objects
-        hostclass = ast.instantiate ''
-        hostclass.each do |klass|
+        if ast.respond_to? :instantiate
+          hostclasses = ast.instantiate ''
+        else
+          hostclasses = ast.hostclasses.values
+        end
+        hostclasses.each do |klass|
           # Only look at classes
-          if klass.type == :hostclass and klass.namespace != ''
+          if klass.type == :hostclass and not already_seen.include? klass.namespace
             params = {}
             # Get parameters and eventual default values
             klass.arguments.each do |name, value|
