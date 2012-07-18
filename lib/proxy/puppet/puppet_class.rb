@@ -36,7 +36,9 @@ module Proxy::Puppet
             klass.arguments.each do |name, value|
               params[name] = ast_to_value(value) rescue nil
             end
-            klasses << new(klass.namespace, params)
+            # Extract modeline from class documentation.
+            modeline = extract_modeline(klass.doc)
+            klasses << new(klass.namespace, params, modeline)
           end
         end
         klasses
@@ -47,9 +49,10 @@ module Proxy::Puppet
 
     end
 
-    def initialize name, params = {}
+    def initialize name, params = {}, modeline = nil
       @klass = name || raise("Must provide puppet class name")
       @params = params || {}
+      @modeline = modeline
     end
 
     def to_s
@@ -67,6 +70,7 @@ module Proxy::Puppet
     end
 
     attr_reader :params
+    attr_reader :modeline
 
     private
     attr_reader :klass
@@ -151,6 +155,23 @@ module Proxy::Puppet
       end
     end
 
+    def self.extract_modeline doc
+      # A modeline is a line beginning with "foreman:", followed by a
+      # string returned as-is to the client (Foreman).
+      match = /^\s*(foreman:.*)$/.match(doc)
+      if match
+        modeline = match[1]
+        modeline.strip!
+        modeline.sub!(/^foreman:\s*/, '')
+        # After removing the "foreman:" header and any surrounding
+        # whitespaces, return the modeline only if it contains data.
+        if modeline != ""
+          return modeline
+        end
+      end
+
+      return nil
+    end
   end
 end
 
