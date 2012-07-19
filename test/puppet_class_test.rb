@@ -2,6 +2,10 @@ require 'test/test_helper'
 
 class PuppetClassTest < Test::Unit::TestCase
 
+  def setup
+    Puppet::Node::Environment.clear
+  end
+
   def test_should_have_a_logger
     assert_respond_to Proxy::Puppet, :logger
   end
@@ -65,6 +69,12 @@ class PuppetClassTest < Test::Unit::TestCase
     klasses =  Proxy::Puppet::PuppetClass.scan_manifest(manifest)
     assert_kind_of Array, klasses
     assert_equal 2, klasses.size
+    klasses.sort! { |k1,k2| k1.name <=> k2.name }
+
+    klass = klasses.first
+
+    assert_equal "install", klass.name
+    assert_equal "foreman", klass.module
 
     klass = klasses.last
 
@@ -78,8 +88,7 @@ class PuppetClassTest < Test::Unit::TestCase
     assert klasses.empty?
   end
 
-  def test_should_extract_parameters
-    # No parameter parenthesis
+  def test_should_extract_parameters__no_param_parenthesis
     manifest = <<-EOF
     class foreman::install {
     }
@@ -89,8 +98,9 @@ class PuppetClassTest < Test::Unit::TestCase
     assert_equal 1, klasses.size
     klass = klasses.first
     assert_equal({}, klass.params)
+  end
 
-    # Empty parameter parenthesis
+  def test_should_extract_parameters__empty_param_parenthesis
     manifest = <<-EOF
     class foreman::install () {
     }
@@ -100,8 +110,9 @@ class PuppetClassTest < Test::Unit::TestCase
     assert_equal 1, klasses.size
     klass = klasses.first
     assert_equal({}, klass.params)
+  end
 
-    # Single parameter with no default value
+  def test_should_extract_parameters__single_param_no_value
     manifest = <<-EOF
     class foreman::install ($mandatory) {
     }
@@ -111,8 +122,9 @@ class PuppetClassTest < Test::Unit::TestCase
     assert_equal 1, klasses.size
     klass = klasses.first
     assert_equal({'mandatory' => nil}, klass.params)
+  end
 
-    # Test type coverage
+  def test_should_extract_parameters__type_coverage
     # Note that all keys are string in Puppet
     manifest = <<-EOF
     class foreman::install (
